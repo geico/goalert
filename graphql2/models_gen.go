@@ -514,10 +514,11 @@ type LabelConnection struct {
 }
 
 type LabelKeySearchOptions struct {
-	First  *int     `json:"first,omitempty"`
-	After  *string  `json:"after,omitempty"`
-	Search *string  `json:"search,omitempty"`
-	Omit   []string `json:"omit,omitempty"`
+	First      *int     `json:"first,omitempty"`
+	After      *string  `json:"after,omitempty"`
+	Search     *string  `json:"search,omitempty"`
+	Omit       []string `json:"omit,omitempty"`
+	TargetType *string  `json:"targetType,omitempty"`
 }
 
 type LabelSearchOptions struct {
@@ -529,11 +530,12 @@ type LabelSearchOptions struct {
 }
 
 type LabelValueSearchOptions struct {
-	Key    string   `json:"key"`
-	First  *int     `json:"first,omitempty"`
-	After  *string  `json:"after,omitempty"`
-	Search *string  `json:"search,omitempty"`
-	Omit   []string `json:"omit,omitempty"`
+	Key        string   `json:"key"`
+	First      *int     `json:"first,omitempty"`
+	After      *string  `json:"after,omitempty"`
+	Search     *string  `json:"search,omitempty"`
+	Omit       []string `json:"omit,omitempty"`
+	TargetType *string  `json:"targetType,omitempty"`
 }
 
 type LinkAccountInfo struct {

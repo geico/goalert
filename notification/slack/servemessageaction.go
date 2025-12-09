@@ -2,6 +2,7 @@ package slack
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"encoding/json"
 	"errors"
@@ -74,27 +75,7 @@ func (s *ChannelSender) ServeMessageAction(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	var payload struct {
-		Type        string
-		ResponseURL string `json:"response_url"`
-		Team        struct {
-			ID     string
-			Domain string
-		}
-		Channel struct {
-			ID string
-		}
-		User struct {
-			ID       string `json:"id"`
-			Username string `json:"username"`
-			Name     string
-		}
-		Actions []struct {
-			ActionID string `json:"action_id"`
-			BlockID  string `json:"block_id"`
-			Value    string `json:"value"`
-		}
-	}
+	var payload SlackPayload
 	err = json.Unmarshal([]byte(req.FormValue("payload")), &payload)
 	if errutil.HTTPError(ctx, w, err) {
 		return
@@ -106,6 +87,7 @@ func (s *ChannelSender) ServeMessageAction(w http.ResponseWriter, req *http.Requ
 	}
 
 	act := payload.Actions[0]
+
 	if act.BlockID != alertResponseBlockID {
 		errutil.HTTPError(ctx, w, validation.NewFieldErrorf("block_id", "unknown block ID '%s'", act.BlockID))
 		return
@@ -117,6 +99,13 @@ func (s *ChannelSender) ServeMessageAction(w http.ResponseWriter, req *http.Requ
 		res = notification.ResultAcknowledge
 	case alertCloseActionID:
 		res = notification.ResultResolve
+	case showDetailsActionID:
+		// Handle show details - we need to expand the details in the message
+		err = s.handleShowDetailsAction(ctx, payload, w)
+		if err != nil {
+			errutil.HTTPError(ctx, w, err)
+		}
+		return
 	case linkActActionID:
 		err = s.withClient(ctx, func(c *slack.Client) error {
 			// remove ephemeral 'Link Account' button
@@ -197,4 +186,136 @@ func (s *ChannelSender) ServeMessageAction(w http.ResponseWriter, req *http.Requ
 	if errutil.HTTPError(ctx, w, err) {
 		return
 	}
+}
+
+type SlackPayload struct {
+	Type        string
+	ResponseURL string `json:"response_url"`
+	Team        struct {
+		ID     string
+		Domain string
+	}
+	Channel struct {
+		ID string
+	}
+	User struct {
+		ID       string `json:"id"`
+		Username string `json:"username"`
+		Name     string
+	}
+	Actions []struct {
+		ActionID string `json:"action_id"`
+		BlockID  string `json:"block_id"`
+		Value    string `json:"value"`
+	}
+}
+
+func (s *ChannelSender) handleShowDetailsAction(ctx context.Context, payload SlackPayload, w http.ResponseWriter) error {
+	// Parse the details from the action value (which now contains JSON)
+	act := payload.Actions[0]
+
+	alertDetails, err := parseDetailsFromActionValue(act.Value)
+	if err != nil {
+		return fmt.Errorf("invalid details in action value: %w", err)
+	}
+
+	// Build the expanded message blocks
+	expandedBlocks := s.buildExpandedAlertBlocks(ctx, alertDetails)
+
+	// Update the original message with expanded details
+	return s.withClient(ctx, func(c *slack.Client) error {
+		// Use the response_url to update the original message
+		_, _, err := c.PostMessageContext(ctx, payload.Channel.ID,
+			slack.MsgOptionResponseURL(payload.ResponseURL, "in_channel"),
+			slack.MsgOptionBlocks(expandedBlocks...),
+			slack.MsgOptionReplaceOriginal(payload.ResponseURL),
+		)
+
+		return err
+	})
+}
+
+// Helper function to parse alert details from action value JSON
+func parseDetailsFromActionValue(value string) (*AlertDetails, error) {
+	var payload struct {
+		Type       string `json:"type"`
+		AlertID    int    `json:"alert_id"`
+		Summary    string `json:"summary"`
+		Details    string `json:"details"`
+		CallbackID string `json:"callback_id"`
+	}
+
+	if err := json.Unmarshal([]byte(value), &payload); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON payload: %w", err)
+	}
+
+	if payload.Type != "show_details" {
+		return nil, fmt.Errorf("unexpected payload type: %s", payload.Type)
+	}
+
+	return &AlertDetails{
+		ID:         payload.AlertID,
+		Summary:    payload.Summary,
+		Details:    payload.Details,
+		Status:     "unacknowledged", // Default status
+		CallbackID: payload.CallbackID,
+	}, nil
+}
+
+// Helper struct for alert details
+type AlertDetails struct {
+	ID         int
+	Summary    string
+	Details    string
+	Status     string
+	CallbackID string
+} // Helper function to build expanded alert message blocks
+func (s *ChannelSender) buildExpandedAlertBlocks(ctx context.Context, alert *AlertDetails) []slack.Block {
+	blocks := []slack.Block{
+		// Alert title/summary
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", alertLink(ctx, alert.ID, alert.Summary), false, false),
+			nil, nil,
+		),
+	}
+
+	// Add full details section
+	if alert.Details != "" {
+		blocks = append(blocks,
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Details:*\n```%s```", alert.Details), false, false),
+				nil, nil,
+			),
+		)
+	}
+
+	// Add status context
+	blocks = append(blocks,
+		slack.NewContextBlock("",
+			slack.NewTextBlockObject("plain_text", fmt.Sprintf("Status: %s • Details expanded", alert.Status), false, false),
+		),
+	)
+
+	// Add action buttons (without Show Details since it's now expanded)
+	var actionButtons []slack.BlockElement
+	if alert.Status == "unacknowledged" {
+		actionButtons = append(actionButtons,
+			slack.NewButtonBlockElement(alertAckActionID, alert.CallbackID,
+				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false)),
+		)
+	}
+
+	actionButtons = append(actionButtons,
+		slack.NewButtonBlockElement(alertCloseActionID, alert.CallbackID,
+			slack.NewTextBlockObject("plain_text", "Close", false, false)),
+	)
+
+	if len(actionButtons) > 0 {
+		blocks = append(blocks,
+			slack.NewDividerBlock(),
+			slack.NewActionBlock(alertResponseBlockID, actionButtons...),
+		)
+	}
+
+	return blocks
 }

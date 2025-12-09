@@ -295,6 +295,7 @@ input LabelKeySearchOptions {
   after: String = ""
   search: String = ""
   omit: [String!]
+  targetType: String
 }
 
 input LabelValueSearchOptions {
@@ -303,6 +304,7 @@ input LabelValueSearchOptions {
   after: String = ""
   search: String = ""
   omit: [String!]
+  targetType: String
 }
 
 input IntegrationKeySearchOptions {
@@ -1342,6 +1344,8 @@ type User {
   isFavorite: Boolean!
 
   assignedSchedules: [Schedule!]!
+
+  labels: [Label!]!
 }
 
 type UserSession {

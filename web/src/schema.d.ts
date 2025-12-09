@@ -705,6 +705,7 @@ export interface LabelKeySearchOptions {
   first?: null | number
   omit?: null | string[]
   search?: null | string
+  targetType?: null | string
 }
 
 export interface LabelSearchOptions {
@@ -721,6 +722,7 @@ export interface LabelValueSearchOptions {
   key: string
   omit?: null | string[]
   search?: null | string
+  targetType?: null | string
 }
 
 export interface LinkAccountInfo {
@@ -1413,6 +1415,7 @@ export interface User {
   email: string
   id: string
   isFavorite: boolean
+  labels: Label[]
   name: string
   notificationRules: UserNotificationRule[]
   onCallOverview: OnCallOverview
@@ -1657,6 +1660,7 @@ type ConfigID =
   | 'Slack.AccessToken'
   | 'Slack.SigningSecret'
   | 'Slack.InteractiveMessages'
+  | 'Slack.IncludeDetails'
   | 'Twilio.Enable'
   | 'Twilio.VoiceName'
   | 'Twilio.VoiceLanguage'

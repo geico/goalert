@@ -139,6 +139,7 @@ export const querySelectPropTypes = {
   placeholder: p.string,
   disabled: p.bool,
   labelKey: p.string,
+  targetType: p.string,
 }
 
 // makeQuerySelect will return a new React component that can be used

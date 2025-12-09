@@ -16,7 +16,7 @@ import { useSessionInfo } from '../util/RequireConfig'
 import UserEditDialog from './UserEditDialog'
 import UserDeleteDialog from './UserDeleteDialog'
 import { QuerySetFavoriteButton } from '../util/QuerySetFavoriteButton'
-import { User } from '../../schema'
+import { User, Label } from '../../schema'
 import { useIsWidthDown } from '../util/useWidth'
 import UserShiftsCalendar from './UserShiftsCalendar'
 import UserContactMethodCreateDialog from './UserContactMethodCreateDialog'
@@ -34,6 +34,10 @@ const userQuery = gql`
       onCallOverview {
         serviceCount
       }
+      labels {
+        key
+        value
+      }
     }
   }
 `
@@ -50,6 +54,10 @@ const profileQuery = gql`
       }
       onCallOverview {
         serviceCount
+      }
+      labels {
+        key
+        value
       }
       sessions {
         id
@@ -88,6 +96,8 @@ export default function UserDetails(props: {
 
   const disableNR = user.contactMethods.length === 0
 
+  const labels: Label[] = user.labels || []
+
   const links = [
     {
       label: 'On-Call Assignments',
@@ -97,6 +107,14 @@ export default function UserDetails(props: {
         : 'Not currently on-call',
     },
   ]
+
+  if (isAdmin || userID === currentUserID) {
+    links.push({
+      label: 'Labels',
+      url: 'labels',
+      subText: 'Manage user labels and tags',
+    })
+  }
 
   if (userID === currentUserID) {
     links.push({
@@ -208,6 +226,7 @@ export default function UserDetails(props: {
         avatar={<UserAvatar userID={userID} />}
         title={user.name + (svcCount ? ' (On-Call)' : '')}
         subheader={user.email}
+        labels={labels}
         pageContent={
           <Grid container spacing={2}>
             <UserContactMethodList userID={userID} readOnly={props.readOnly} />

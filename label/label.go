@@ -15,7 +15,7 @@ type Label struct {
 // Normalize will validate and normalize the label, returning a copy.
 func (l Label) Normalize() (*Label, error) {
 	return &l, validate.Many(
-		validate.OneOf("TargetType", l.Target.TargetType(), assignment.TargetTypeService),
+		validate.OneOf("TargetType", l.Target.TargetType(), assignment.TargetTypeService, assignment.TargetTypeUser),
 		validate.UUID("TargetID", l.Target.TargetID()),
 		validate.LabelKey("Key", l.Key),
 		validate.LabelValue("Value", l.Value),

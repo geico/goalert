@@ -20,6 +20,9 @@ func (q *Query) LabelKeys(ctx context.Context, input *graphql2.LabelKeySearchOpt
 	if input.Search != nil {
 		opts.Search = *input.Search
 	}
+	if input.TargetType != nil {
+		opts.TargetType = *input.TargetType
+	}
 	opts.Omit = input.Omit
 	if input.After != nil && *input.After != "" {
 		err = search.ParseCursor(*input.After, &opts)
@@ -67,6 +70,9 @@ func (q *Query) LabelValues(ctx context.Context, input *graphql2.LabelValueSearc
 	var opts label.ValueSearchOptions
 	if input.Search != nil {
 		opts.Search = *input.Search
+	}
+	if input.TargetType != nil {
+		opts.TargetType = *input.TargetType
 	}
 	opts.Omit = input.Omit
 	opts.Key = input.Key

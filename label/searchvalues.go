@@ -24,6 +24,13 @@ var valueSearchTemplate = template.Must(template.New("value-search").Parse(`
 	SELECT DISTINCT ON (lower(value), value) value
 	FROM labels l
 	WHERE key = :key
+	{{if .TargetType}}
+		{{if eq .TargetType "service"}}
+			AND l.tgt_service_id IS NOT NULL
+		{{else if eq .TargetType "user"}}
+			AND l.tgt_user_id IS NOT NULL
+		{{end}}
+	{{end}}
 	{{if .Omit}}
 		AND not value = any(:omit)
 	{{end}}

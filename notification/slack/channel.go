@@ -369,13 +369,46 @@ const (
 	alertCloseActionID   = "action_alert_close"
 	alertAckActionID     = "action_alert_ack"
 	linkActActionID      = "action_link_account"
+	showDetailsActionID  = "action_show_details"
 )
 
 // alertMsgOption will return the slack.MsgOption for an alert-type message (e.g., notification or status update).
-func alertMsgOption(ctx context.Context, callbackID string, id int, summary, logEntry string, state notification.AlertState) slack.MsgOption {
+func alertMsgOption(ctx context.Context, callbackID string, id int, summary, details, logEntry string, state notification.AlertState) slack.MsgOption {
 	blocks := []slack.Block{
 		slack.NewSectionBlock(
 			slack.NewTextBlockObject("mrkdwn", alertLink(ctx, id, summary), false, false), nil, nil),
+	}
+
+	cfg := config.FromContext(ctx)
+
+	// Add details as a collapsible context if present and enabled in config
+	if details != "" && cfg.Slack.IncludeDetails {
+		// Truncate details for preview - show first line or first 150 characters
+		detailsLines := strings.Split(details, "\n")
+		detailsPreview := detailsLines[0]
+
+		if len(detailsPreview) > 150 {
+			detailsPreview = detailsPreview[:150] + "..."
+		}
+
+		hasMore := len(detailsLines) > 1 || len(details) > 150
+
+		if hasMore {
+			// Show preview with "Show more" option
+			blocks = append(blocks,
+				slack.NewContextBlock("details_preview",
+					slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Details:* %s", detailsPreview), false, false),
+					slack.NewTextBlockObject("mrkdwn", "_Click 'Show Details' to expand_", false, false),
+				),
+			)
+		} else {
+			// Show full details if short enough
+			blocks = append(blocks,
+				slack.NewContextBlock("details_full",
+					slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*Details:* %s", details), false, false),
+				),
+			)
+		}
 	}
 
 	var color string
@@ -383,20 +416,38 @@ func alertMsgOption(ctx context.Context, callbackID string, id int, summary, log
 	switch state {
 	case notification.AlertStateAcknowledged:
 		color = colorAcked
+		actionButtons := []slack.BlockElement{
+			slack.NewButtonBlockElement(alertCloseActionID, callbackID, slack.NewTextBlockObject("plain_text", "Close", false, false)),
+		}
+		// Add "Show Details" button if details exist and are long and config allows details
+		if details != "" && cfg.Slack.IncludeDetails && (len(strings.Split(details, "\n")) > 1 || len(details) > 150) {
+			// Create a details payload with alert info
+			detailsPayload := fmt.Sprintf(`{"type":"show_details","alert_id":%d,"summary":%q,"details":%q,"callback_id":%q}`,
+				id, summary, details, callbackID)
+			actionButtons = append(actionButtons,
+				slack.NewButtonBlockElement(showDetailsActionID, detailsPayload, slack.NewTextBlockObject("plain_text", "Show Details", false, false)))
+		}
 		actions = []slack.Block{
 			slack.NewDividerBlock(),
-			slack.NewActionBlock(alertResponseBlockID,
-				slack.NewButtonBlockElement(alertCloseActionID, callbackID, slack.NewTextBlockObject("plain_text", "Close", false, false)),
-			),
+			slack.NewActionBlock(alertResponseBlockID, actionButtons...),
 		}
 	case notification.AlertStateUnacknowledged:
 		color = colorUnacked
+		actionButtons := []slack.BlockElement{
+			slack.NewButtonBlockElement(alertAckActionID, callbackID, slack.NewTextBlockObject("plain_text", "Acknowledge", false, false)),
+			slack.NewButtonBlockElement(alertCloseActionID, callbackID, slack.NewTextBlockObject("plain_text", "Close", false, false)),
+		}
+		// Add "Show Details" button if details exist and are long and config allows details
+		if details != "" && cfg.Slack.IncludeDetails && (len(strings.Split(details, "\n")) > 1 || len(details) > 150) {
+			// Create a details payload with alert info
+			detailsPayload := fmt.Sprintf(`{"type":"show_details","alert_id":%d,"summary":%q,"details":%q,"callback_id":%q}`,
+				id, summary, details, callbackID)
+			actionButtons = append(actionButtons,
+				slack.NewButtonBlockElement(showDetailsActionID, detailsPayload, slack.NewTextBlockObject("plain_text", "Show Details", false, false)))
+		}
 		actions = []slack.Block{
 			slack.NewDividerBlock(),
-			slack.NewActionBlock(alertResponseBlockID,
-				slack.NewButtonBlockElement(alertAckActionID, callbackID, slack.NewTextBlockObject("plain_text", "Acknowledge", false, false)),
-				slack.NewButtonBlockElement(alertCloseActionID, callbackID, slack.NewTextBlockObject("plain_text", "Close", false, false)),
-			),
+			slack.NewActionBlock(alertResponseBlockID, actionButtons...),
 		}
 	case notification.AlertStateClosed:
 		color = colorClosed
@@ -405,7 +456,6 @@ func alertMsgOption(ctx context.Context, callbackID string, id int, summary, log
 	blocks = append(blocks,
 		slack.NewContextBlock("", slack.NewTextBlockObject("plain_text", logEntry, false, false)),
 	)
-	cfg := config.FromContext(ctx)
 	if len(actions) > 0 && cfg.Slack.InteractiveMessages {
 		blocks = append(blocks, actions...)
 	}
@@ -440,6 +490,7 @@ func (s *ChannelSender) SendMessage(ctx context.Context, msg notification.Messag
 
 	var opts []slack.MsgOption
 	var isUpdate bool
+	var externalID string
 	channelID := msg.DestArg(FieldSlackChannelID)
 	if msg.DestType() == DestTypeSlackDirectMessage {
 		// DMs are sent to the user ID, not the channel ID.
@@ -465,14 +516,14 @@ func (s *ChannelSender) SendMessage(ctx context.Context, msg notification.Messag
 			break
 		}
 
-		opts = append(opts, alertMsgOption(ctx, t.MsgID(), t.AlertID, t.Summary, "Unacknowledged", notification.AlertStateUnacknowledged))
+		opts = append(opts, alertMsgOption(ctx, t.MsgID(), t.AlertID, t.Summary, t.Details, "Unacknowledged", notification.AlertStateUnacknowledged))
 	case notification.AlertStatus:
 		isUpdate = true
 		var ts string
 		channelID, ts = chanTS(channelID, t.OriginalStatus.ProviderMessageID.ExternalID)
 		opts = append(opts,
 			slack.MsgOptionUpdate(ts),
-			alertMsgOption(ctx, t.OriginalStatus.ID, t.AlertID, t.Summary, t.LogEntry, t.NewAlertState),
+			alertMsgOption(ctx, t.OriginalStatus.ID, t.AlertID, t.Summary, "", t.LogEntry, t.NewAlertState),
 		)
 	case notification.AlertBundle:
 		opts = append(opts, slack.MsgOptionText(
@@ -486,7 +537,6 @@ func (s *ChannelSender) SendMessage(ctx context.Context, msg notification.Messag
 		return nil, errors.Errorf("unsupported message type: %T", t)
 	}
 
-	var externalID string
 	err := s.withClient(ctx, func(c *slack.Client) error {
 		msgChan, msgTS, err := c.PostMessageContext(ctx, channelID, opts...)
 		if err != nil {

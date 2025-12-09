@@ -18,6 +18,7 @@ import (
 	"github.com/target/goalert/assignment"
 	"github.com/target/goalert/escalation"
 	"github.com/target/goalert/graphql2"
+	"github.com/target/goalert/label"
 	"github.com/target/goalert/permission"
 	"github.com/target/goalert/search"
 	"github.com/target/goalert/user"
@@ -375,6 +376,10 @@ func (a *Query) User(ctx context.Context, id *string) (*user.User, error) {
 		userID = permission.UserID(ctx)
 	}
 	return (*App)(a).FindOneUser(ctx, userID)
+}
+
+func (a *User) Labels(ctx context.Context, raw *user.User) ([]label.Label, error) {
+	return a.LabelStore.FindAllByUser(ctx, a.DB, raw.ID)
 }
 
 func (a *User) IsFavorite(ctx context.Context, raw *user.User) (bool, error) {

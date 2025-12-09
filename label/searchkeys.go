@@ -21,6 +21,9 @@ type KeySearchOptions struct {
 	// Omit specifies a list of key names to exclude from the results.
 	Omit []string `json:"o,omitempty"`
 
+	// TargetType filters by target type: "service" or "user"
+	TargetType string `json:"t,omitempty"`
+
 	Limit int `json:"-"`
 }
 
@@ -28,6 +31,13 @@ var keySearchTemplate = template.Must(template.New("key-search").Parse(`
 	SELECT DISTINCT ON (lower(key), key) key
 	FROM labels l
 	WHERE true
+	{{if .TargetType}}
+		{{if eq .TargetType "service"}}
+			AND l.tgt_service_id IS NOT NULL
+		{{else if eq .TargetType "user"}}
+			AND l.tgt_user_id IS NOT NULL
+		{{end}}
+	{{end}}
 	{{if .Omit}}
 		AND not key = any(:omit)
 	{{end}}

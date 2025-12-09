@@ -1,7 +1,7 @@
 import React, { Suspense, useState } from 'react'
 import { gql, useQuery } from 'urql'
 import { UserAvatar } from '../util/avatars'
-import UserPhoneNumberFilterContainer from './UserPhoneNumberFilterContainer'
+import UserFilterContainer from './UserFilterContainer'
 import UserCreateDialog from './UserCreateDialog'
 import { useSessionInfo } from '../util/RequireConfig'
 import ListPageControls from '../lists/ListPageControls'
@@ -11,6 +11,7 @@ import { useURLParam } from '../actions'
 import { FavoriteIcon } from '../util/SetFavoriteButton'
 import { CompListItemNav } from '../lists/CompListItems'
 import CompList from '../lists/CompList'
+import getUserFilters from '../util/getUserFilters'
 
 const query = gql`
   query usersQuery($input: UserSearchOptions) {
@@ -34,18 +35,16 @@ const context = { suspense: false }
 function UserList(): JSX.Element {
   const { isAdmin } = useSessionInfo()
   const [create, setCreate] = useState(false)
-  const [search] = useURLParam<string>('search', '')
+  const [search, setSearch] = useURLParam<string>('search', '')
   const [cursor, setCursor] = useState('')
+
+  const { labelKey, labelValue, phoneNumber } = getUserFilters(search)
 
   const inputVars = {
     favoritesFirst: true,
-    search,
-    CMValue: '',
+    search: labelKey ? labelKey + '=' + labelValue : '',
+    CMValue: phoneNumber,
     after: cursor,
-  }
-  if (search.startsWith('phone=')) {
-    inputVars.CMValue = search.replace(/^phone=/, '')
-    inputVars.search = ''
   }
 
   const [q] = useQuery<{ users: UserConnection }>({
@@ -76,7 +75,33 @@ function UserList(): JSX.Element {
         loading={q.fetching}
         onCreateClick={isAdmin ? () => setCreate(true) : undefined}
         slots={{
-          search: <Search endAdornment={<UserPhoneNumberFilterContainer />} />,
+          search: (
+            <Search 
+              endAdornment={
+                <UserFilterContainer 
+                  value={{ labelKey, labelValue, phoneNumber }}
+                  onChange={({ labelKey, labelValue, phoneNumber }) => {
+                    const labelSearch = labelKey
+                      ? labelKey + '=' + labelValue
+                      : ''
+                    const phoneSearch = phoneNumber 
+                      ? 'phone=' + phoneNumber
+                      : ''
+                    
+                    // Combine searches with space if both exist
+                    const combinedSearch = [labelSearch, phoneSearch]
+                      .filter(s => s)
+                      .join(' ')
+                    
+                    setSearch(combinedSearch)
+                  }}
+                  onReset={() => {
+                    setSearch('')
+                  }}
+                />
+              } 
+            />
+          ),
           list: (
             <CompList emptyMessage='No results'>
               {q.data?.users.nodes.map((u) => (

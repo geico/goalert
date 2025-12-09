@@ -18,10 +18,12 @@ export const LabelValueSelect = makeQuerySelect('LabelValueSelect', {
   query,
   extraVariablesFunc: ({
     labelKey: key,
+    targetType,
     ...props
   }: {
     labelKey: string
+    targetType?: string
     props: LabelValueSearchProps
-  }) => [props, { key }],
+  }) => [props, { key, targetType }],
   mapDataNode: (value: string) => ({ label: value, value }),
 })

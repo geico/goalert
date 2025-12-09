@@ -60,7 +60,7 @@ type SearchCursor struct {
 }
 
 var searchTemplate = template.Must(template.New("search").Funcs(search.Helpers()).Parse(`
-	SELECT DISTINCT ON ({{ .OrderBy }})
+	SELECT{{if .LabelKey}} DISTINCT ON ({{ .OrderBy }}){{end}}
 		usr.id, usr.name, usr.email, usr.role, fav IS DISTINCT FROM NULL
 	FROM users usr
 	{{ if gt (len .DestArgs) 0 }}
@@ -69,11 +69,27 @@ var searchTemplate = template.Must(template.New("search").Funcs(search.Helpers()
 	{{if not .FavoritesOnly}}
 		LEFT {{end}} JOIN user_favorites fav on usr.id = fav.tgt_user_id 
 			AND {{if .FavoritesUserID}} fav.user_id = :favUserID{{else}}false{{end}}
+	{{if and .LabelKey (not .LabelNegate)}}
+		JOIN labels l ON
+			l.tgt_user_id = usr.id AND
+			l.key = :labelKey
+			{{if ne .LabelValue "*"}} AND value = :labelValue{{end}}
+	{{end}}
 	WHERE true
 	{{if .Omit}}
 		AND not usr.id = any(:omit)
 	{{end}}
-	{{if .Search}}
+	{{- if and .LabelKey .LabelNegate}}
+		AND usr.id NOT IN (
+			SELECT tgt_user_id
+			FROM labels
+			WHERE
+				tgt_user_id NOTNULL AND
+				key = :labelKey
+				{{if ne .LabelValue "*"}} AND value = :labelValue{{end}}
+		)
+	{{end}}
+	{{- if and .Search (not .LabelKey)}}
 		AND ({{orderedPrefixSearch "search" "usr.name"}}  OR {{contains "search" "usr.name"}})
 	{{end}}
 	{{if .After.Name}}
@@ -111,6 +127,9 @@ func (opts renderData) SearchString() string {
 	if opts.Email() != "" {
 		return ""
 	}
+	if opts.LabelKey() != "" {
+		return ""
+	}
 
 	return opts.Search
 }
@@ -120,6 +139,37 @@ func (opts renderData) Email() string {
 		return ""
 	}
 	return strings.TrimPrefix(opts.Search, "email=")
+}
+
+func (opts renderData) LabelKey() string {
+	searchStr := opts.Search
+	idx := strings.IndexByte(searchStr, '=')
+	if idx == -1 {
+		return ""
+	}
+	return strings.TrimSuffix(searchStr[:idx], "!") // if `!=` is used
+}
+
+func (opts renderData) LabelValue() string {
+	searchStr := opts.Search
+	idx := strings.IndexByte(searchStr, '=')
+	if idx == -1 {
+		return ""
+	}
+	val := searchStr[idx+1:]
+	if val == "" {
+		return "*"
+	}
+	return val
+}
+
+func (opts renderData) LabelNegate() bool {
+	idx := strings.IndexByte(opts.Search, '=')
+	if idx < 1 {
+		return false
+	}
+
+	return opts.Search[idx-1] == '!'
 }
 
 func (opts renderData) Normalize() (*renderData, error) {
@@ -142,6 +192,14 @@ func (opts renderData) Normalize() (*renderData, error) {
 	if opts.FavoritesOnly || opts.FavoritesFirst || opts.FavoritesUserID != "" {
 		err = validate.Many(err, validate.UUID("FavoritesUserID", opts.FavoritesUserID))
 	}
+	if opts.LabelKey() != "" {
+		err = validate.Many(err, validate.Search("LabelKey", opts.LabelKey()))
+		if opts.LabelValue() != "*" {
+			err = validate.Many(err,
+				validate.LabelValue("LabelValue", opts.LabelValue()),
+			)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +216,9 @@ func (opts renderData) QueryArgs() []sql.NamedArg {
 		sql.Named("DestType", opts.DestType),
 		sql.Named("favUserID", opts.FavoritesUserID),
 		sql.Named("Email", opts.Email()),
+		sql.Named("labelKey", opts.LabelKey()),
+		sql.Named("labelValue", opts.LabelValue()),
+		sql.Named("labelNegate", opts.LabelNegate()),
 	}
 }
 

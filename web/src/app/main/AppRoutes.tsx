@@ -35,6 +35,7 @@ import ServiceLabelList from '../services/ServiceLabelList'
 import ServiceList from '../services/ServiceList'
 import UserCalendarSubscriptionList from '../users/UserCalendarSubscriptionList'
 import UserDetails from '../users/UserDetails'
+import UserLabelList from '../users/UserLabelList'
 import UserList from '../users/UserList'
 import UserOnCallAssignmentList from '../users/UserOnCallAssignmentList'
 import UserSessionList from '../users/UserSessionList'
@@ -109,6 +110,7 @@ export const routes: Record<string, JSXElementConstructor<any>> = {
 
   '/users': UserList,
   '/users/:userID': UserDetails,
+  '/users/:userID/labels': UserLabelList,
   '/users/:userID/on-call-assignments': UserOnCallAssignmentList,
   '/users/:userID/schedule-calendar-subscriptions':
     UserCalendarSubscriptionList,

@@ -820,6 +820,7 @@ type ComplexityRoot struct {
 		Email                 func(childComplexity int) int
 		ID                    func(childComplexity int) int
 		IsFavorite            func(childComplexity int) int
+		Labels                func(childComplexity int) int
 		Name                  func(childComplexity int) int
 		NotificationRules     func(childComplexity int) int
 		OnCallOverview        func(childComplexity int) int
@@ -1134,6 +1135,7 @@ type UserResolver interface {
 	OnCallOverview(ctx context.Context, obj *user.User) (*OnCallOverview, error)
 	IsFavorite(ctx context.Context, obj *user.User) (bool, error)
 	AssignedSchedules(ctx context.Context, obj *user.User) ([]schedule.Schedule, error)
+	Labels(ctx context.Context, obj *user.User) ([]label.Label, error)
 }
 type UserCalendarSubscriptionResolver interface {
 	ReminderMinutes(ctx context.Context, obj *calsub.Subscription) ([]int, error)
@@ -4584,6 +4586,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.IsFavorite(childComplexity), true
+	case "User.labels":
+		if e.complexity.User.Labels == nil {
+			break
+		}
+
+		return e.complexity.User.Labels(childComplexity), true
 	case "User.name":
 		if e.complexity.User.Name == nil {
 			break
@@ -11381,6 +11389,8 @@ func (ec *executionContext) fieldContext_GQLAPIKey_createdBy(_ context.Context, 
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -11469,6 +11479,8 @@ func (ec *executionContext) fieldContext_GQLAPIKey_updatedBy(_ context.Context, 
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -14830,6 +14842,8 @@ func (ec *executionContext) fieldContext_Mutation_createUser(ctx context.Context
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -16617,6 +16631,8 @@ func (ec *executionContext) fieldContext_OnCallShift_user(_ context.Context, fie
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -17202,6 +17218,8 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -19955,6 +19973,8 @@ func (ec *executionContext) fieldContext_Rotation_users(_ context.Context, field
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -23586,6 +23606,41 @@ func (ec *executionContext) fieldContext_User_assignedSchedules(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _User_labels(ctx context.Context, field graphql.CollectedField, obj *user.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_labels,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.User().Labels(ctx, obj)
+		},
+		nil,
+		ec.marshalNLabel2ᚕgithubᚗcomᚋtargetᚋgoalertᚋlabelᚐLabelᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_labels(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "key":
+				return ec.fieldContext_Label_key(ctx, field)
+			case "value":
+				return ec.fieldContext_Label_value(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Label", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _UserCalendarSubscription_id(ctx context.Context, field graphql.CollectedField, obj *calsub.Subscription) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -23923,6 +23978,8 @@ func (ec *executionContext) fieldContext_UserConnection_nodes(_ context.Context,
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -24678,6 +24735,8 @@ func (ec *executionContext) fieldContext_UserOverride_addUser(_ context.Context,
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -24737,6 +24796,8 @@ func (ec *executionContext) fieldContext_UserOverride_removeUser(_ context.Conte
 				return ec.fieldContext_User_isFavorite(ctx, field)
 			case "assignedSchedules":
 				return ec.fieldContext_User_assignedSchedules(ctx, field)
+			case "labels":
+				return ec.fieldContext_User_labels(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -28550,7 +28611,7 @@ func (ec *executionContext) unmarshalInputLabelKeySearchOptions(ctx context.Cont
 		asMap["search"] = ""
 	}
 
-	fieldsInOrder := [...]string{"first", "after", "search", "omit"}
+	fieldsInOrder := [...]string{"first", "after", "search", "omit", "targetType"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -28585,6 +28646,13 @@ func (ec *executionContext) unmarshalInputLabelKeySearchOptions(ctx context.Cont
 				return it, err
 			}
 			it.Omit = data
+		case "targetType":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetType"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetType = data
 		}
 	}
 
@@ -28676,7 +28744,7 @@ func (ec *executionContext) unmarshalInputLabelValueSearchOptions(ctx context.Co
 		asMap["search"] = ""
 	}
 
-	fieldsInOrder := [...]string{"key", "first", "after", "search", "omit"}
+	fieldsInOrder := [...]string{"key", "first", "after", "search", "omit", "targetType"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -28718,6 +28786,13 @@ func (ec *executionContext) unmarshalInputLabelValueSearchOptions(ctx context.Co
 				return it, err
 			}
 			it.Omit = data
+		case "targetType":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetType"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetType = data
 		}
 	}
 
@@ -39215,6 +39290,42 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._User_assignedSchedules(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "labels":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_labels(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
