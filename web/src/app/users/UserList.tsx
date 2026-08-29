@@ -1,7 +1,7 @@
 import React, { Suspense, useState } from 'react'
 import { gql, useQuery } from 'urql'
 import { UserAvatar } from '../util/avatars'
-import UserPhoneNumberFilterContainer from './UserPhoneNumberFilterContainer'
+import UserSearchFilterContainer from './UserSearchFilterContainer'
 import UserCreateDialog from './UserCreateDialog'
 import { useSessionInfo } from '../util/RequireConfig'
 import ListPageControls from '../lists/ListPageControls'
@@ -43,9 +43,23 @@ function UserList(): JSX.Element {
     CMValue: '',
     after: cursor,
   }
-  if (search.startsWith('phone=')) {
-    inputVars.CMValue = search.replace(/^phone=/, '')
-    inputVars.search = ''
+
+  // Parse phone and email from search param
+  const phoneMatch = search.match(/(?:^|&)phone=([^&]*)/)
+  const emailMatch = search.match(/(?:^|&)email=([^&]*)/)
+
+  if (phoneMatch) {
+    inputVars.CMValue = decodeURIComponent(phoneMatch[1])
+    // If email is also present, keep it in search string, otherwise clear search
+    if (!emailMatch) {
+      inputVars.search = ''
+    } else {
+      // Keep only the email part in search string
+      inputVars.search = `email=${emailMatch[1]}`
+    }
+  } else if (emailMatch) {
+    // Only email, no phone - backend handles email= prefix
+    inputVars.search = `email=${emailMatch[1]}`
   }
 
   const [q] = useQuery<{ users: UserConnection }>({
@@ -76,7 +90,7 @@ function UserList(): JSX.Element {
         loading={q.fetching}
         onCreateClick={isAdmin ? () => setCreate(true) : undefined}
         slots={{
-          search: <Search endAdornment={<UserPhoneNumberFilterContainer />} />,
+          search: <Search endAdornment={<UserSearchFilterContainer />} />,
           list: (
             <CompList emptyMessage='No results'>
               {q.data?.users.nodes.map((u) => (

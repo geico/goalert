@@ -33,6 +33,39 @@ function testUsers(screen: ScreenFormat): void {
       cy.get('main ul > li').should('have.lengthOf', 1)
       cy.get('main ul').should('contain', prof.name)
     })
+
+    it('should handle searching by email', () => {
+      cy.createUser().then((user: Profile) => {
+        cy.visit('/users')
+        if (screen === 'mobile') {
+          cy.get('[data-cy=app-bar] button[data-cy=open-search]').click()
+        }
+        cy.get('button[data-cy="users-filter-button"]').click()
+        cy.form({ 'user-email-search': user.email })
+        cy.get('main ul > li').should('have.lengthOf', 1)
+        cy.get('main ul').should('contain', user.name)
+      })
+    })
+
+    it('should handle searching by both phone and email', () => {
+      cy.createUser().then((user: Profile) => {
+        cy.addContactMethod({ type: 'SMS', userID: user.id }).then(
+          (userCM: ContactMethod) => {
+            cy.visit('/users')
+            if (screen === 'mobile') {
+              cy.get('[data-cy=app-bar] button[data-cy=open-search]').click()
+            }
+            cy.get('button[data-cy="users-filter-button"]').click()
+            cy.form({
+              'user-phone-search': userCM.value,
+              'user-email-search': user.email,
+            })
+            cy.get('main ul > li').should('have.lengthOf', 1)
+            cy.get('main ul').should('contain', user.name)
+          },
+        )
+      })
+    })
   })
 
   describe('Details Page', () => {
